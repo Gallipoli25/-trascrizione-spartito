@@ -19,7 +19,8 @@ def transcribe():
     os.system(f"ffmpeg -i {temp_path} -ar 22050 -ac 1 {wav_path}")
 
     output_path = "output.mid"
-    output = inference.predict([wav_path], save_midi=True)
+    output = inference.predict([wav_path])
+
 
 
     os.remove(temp_path)
