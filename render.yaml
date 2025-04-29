@@ -1,8 +1,9 @@
-
 services:
   - type: web
     name: trascrizione-spartito
     env: python
-    plan: free
-    buildCommand: ""
-    startCommand: "python app.py"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "true"
