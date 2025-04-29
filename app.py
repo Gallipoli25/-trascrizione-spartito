@@ -11,7 +11,7 @@ def home():
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
-    file = request.files.get('audio')
+    file = request.files['audio']
     if not file:
         return jsonify({"error": "Nessun file ricevuto"}), 400
 
@@ -26,12 +26,12 @@ def transcribe():
         return jsonify({"error": "Errore durante la conversione audio"}), 500
 
     try:
-        output = inference.predict([temp_output_path], save_midi=True)
-        if output and isinstance(output, list) and isinstance(output[0], dict) and 'note_sequence' in output[0]:
+        output = inference.predict([temp_output_path])  # ✅ CORRETTO
+        if output and isinstance(output, list) and 'note_sequence' in output[0]:
             midi_notes = output[0]['note_sequence']
             return jsonify({ "notes": midi_notes })
         else:
-            return jsonify({ "error": "Analisi audio fallita: note_sequence mancante." }), 500
+            return jsonify({ "error": "Analisi audio fallita." }), 500
     except Exception as e:
         return jsonify({"error": f"Errore nella trascrizione: {str(e)}"}), 500
     finally:
