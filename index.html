@@ -143,6 +143,24 @@
     const name = names[midi % 12];
     return name.replace("#", "#") + "/" + octave;
   }
+
+const fileInput = document.getElementById('audioFile');
+
+fileInput.addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    const response = await fetch('/transcribe', { method: 'POST', body: formData });
+    const midiData = await response.json();
+
+    drawScore(midiData);
+    downloadMidiBtn.style.display = "block";
+    downloadPdfBtn.style.display = "block";
+  }
+});
+
 </script>
 </body>
 </html>
