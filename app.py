@@ -26,8 +26,12 @@ def transcribe():
     os.remove(temp_path)
     os.remove(wav_path)
 
-    midi_notes = output['note_sequence']
-    return jsonify(midi_notes)
+if output and isinstance(output, list) and 'note_sequence' in output[0]:
+    midi_notes = output[0]['note_sequence']
+    return jsonify({ "notes": midi_notes })
+else:
+    return jsonify({ "error": "Trascrizione fallita" }), 500
+
 
 @app.route('/download_midi', methods=['GET'])
 def download_midi():
