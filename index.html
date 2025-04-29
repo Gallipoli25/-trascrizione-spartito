@@ -1,0 +1,145 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Trascrivi Spartito dal Microfono</title>
+  <script src="https://unpkg.com/vexflow/releases/vexflow-min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<script>
+  const password = "Diego.23";
+  function chiediPassword() {
+    const tentativo = prompt("Inserisci la password per accedere:");
+    if (tentativo !== password) {
+      alert("Password errata. Accesso negato.");
+      document.body.innerHTML = "<h1>Accesso Negato</h1>";
+    }
+  }
+  chiediPassword();
+</script>
+
+<h1>Registrazione dal Microfono</h1>
+
+<button id="startRecording">🎙️ Avvia Registrazione</button>
+<button id="stopRecording" disabled>⏹️ Ferma Registrazione</button>
+<button id="downloadMidiBtn" style="display:none;">💾 Scarica MIDI</button>
+<button id="downloadPdfBtn" style="display:none;">📄 Scarica PDF Spartito</button>
+
+<h2>Spartito Generato:</h2>
+<div id="score"></div>
+
+<script>
+  let mediaRecorder;
+  let audioChunks = [];
+
+  const startBtn = document.getElementById('startRecording');
+  const stopBtn = document.getElementById('stopRecording');
+  const downloadMidiBtn = document.getElementById('downloadMidiBtn');
+  const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+
+  startBtn.addEventListener('click', async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.start();
+    audioChunks = [];
+
+    mediaRecorder.addEventListener('dataavailable', event => {
+      audioChunks.push(event.data);
+    });
+
+    mediaRecorder.addEventListener('stop', async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+
+      const response = await fetch('/transcribe', { method: 'POST', body: formData });
+      const midiData = await response.json();
+
+      drawScore(midiData);
+      downloadMidiBtn.style.display = "block";
+      downloadPdfBtn.style.display = "block";
+    });
+
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+  });
+
+  stopBtn.addEventListener('click', () => {
+    mediaRecorder.stop();
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+  });
+
+  downloadMidiBtn.addEventListener('click', () => {
+    window.location.href = '/download_midi';
+  });
+
+  downloadPdfBtn.addEventListener('click', () => {
+    const element = document.getElementById('score');
+    const opt = {
+      margin:       0.5,
+      filename:     'spartito_trascritto.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2 },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    html2pdf().from(element).set(opt).save();
+  });
+
+  function drawScore(midiData) {
+    const VF = Vex.Flow;
+    const div = document.getElementById("score");
+    div.innerHTML = "";
+
+    const renderer = new VF.Renderer(div, VF.Renderer.Backends.SVG);
+    renderer.resize(800, 400);
+    const context = renderer.getContext();
+
+    const titleText = "Trascrizione Automatica";
+    context.setFont("Arial", 20, "").fillText(titleText, 250, 30);
+
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('it-IT');
+    const authorText = `Generato da Utente - ${dateStr}`;
+    context.setFont("Arial", 12, "").fillText(authorText, 250, 55);
+
+    const stave = new VF.Stave(10, 80, 700);
+    stave.addClef("treble").addTimeSignature("4/4");
+    stave.setContext(context).draw();
+
+    const notes = midiData.map(note => {
+      const pitch = midiNumberToNoteName(note.pitch);
+      const durationSeconds = note.end_time - note.start_time;
+      let duration = "q";
+      if (durationSeconds > 1.5) {
+        duration = "w";
+      } else if (durationSeconds > 0.75) {
+        duration = "h";
+      } else if (durationSeconds > 0.35) {
+        duration = "q";
+      } else {
+        duration = "8";
+      }
+      return new VF.StaveNote({ clef: "treble", keys: [pitch], duration: duration });
+    });
+
+    const voice = new VF.Voice({ num_beats: 4, beat_value: 4 });
+    voice.addTickables(notes);
+
+    const formatter = new VF.Formatter().joinVoices([voice]).format([voice], 600);
+    voice.draw(context, stave);
+  }
+
+  function midiNumberToNoteName(midi) {
+    const octave = Math.floor(midi / 12) - 1;
+    const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const name = names[midi % 12];
+    return name.replace("#", "#") + "/" + octave;
+  }
+</script>
+</body>
+</html>
