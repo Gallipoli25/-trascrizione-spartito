@@ -27,13 +27,19 @@ def transcribe():
         os.remove(temp_input_path)
         return jsonify({"error": "Errore durante la conversione audio"}), 500
 
-    try:
-output = inference.predict([temp_output_path], save_midi=True)
-if output and isinstance(output, list) and 'note_sequence' in output[0]:
-    midi_notes = output[0]['note_sequence']
-    return jsonify({ "notes": midi_notes })
-else:
-    return jsonify({ "error": "Analisi audio fallita." }), 500
+   try:
+    output = inference.predict([temp_output_path], save_midi=True)
+    if output and isinstance(output, list) and 'note_sequence' in output[0]:
+        midi_notes = output[0]['note_sequence']
+        return jsonify({ "notes": midi_notes })
+    else:
+        return jsonify({ "error": "Analisi audio fallita." }), 500
+except Exception as e:
+    return jsonify({"error": f"Errore nella trascrizione: {str(e)}"}), 500
+finally:
+    os.remove(temp_input_path)
+    os.remove(temp_output_path)
+
 
     except Exception as e:
         return jsonify({"error": f"Errore nella trascrizione: {str(e)}"}), 500
