@@ -35,36 +35,36 @@
 <h2>Spartito Generato:</h2>
 <div id="score"></div>
 
-<script>
+
+ <script>
   let mediaRecorder;
   let audioChunks = [];
   let selectedAudioBlob = null;
 
   const startBtn = document.getElementById('startRecording');
   const stopBtn = document.getElementById('stopRecording');
-  const fileInput = document.getElementById('audioFile');
   const transcribeBtn = document.getElementById('transcribeBtn');
+  const fileInput = document.getElementById('audioFile');
   const downloadMidiBtn = document.getElementById('downloadMidiBtn');
   const downloadPdfBtn = document.getElementById('downloadPdfBtn');
 
   startBtn.addEventListener('click', async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
-
     audioChunks = [];
-    mediaRecorder.start();
 
-    mediaRecorder.addEventListener('dataavailable', event => {
+    mediaRecorder.ondataavailable = event => {
       if (event.data.size > 0) {
         audioChunks.push(event.data);
       }
-    });
+    };
 
-    mediaRecorder.addEventListener('stop', () => {
+    mediaRecorder.onstop = () => {
       selectedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       transcribeBtn.disabled = false;
-    });
+    };
 
+    mediaRecorder.start();
     startBtn.disabled = true;
     stopBtn.disabled = false;
   });
@@ -93,11 +93,16 @@
     formData.append('audio', selectedAudioBlob);
 
     const response = await fetch('/transcribe', { method: 'POST', body: formData });
-    const midiData = await response.json();
 
-    drawScore(midiData);
-    downloadMidiBtn.style.display = "inline-block";
-    downloadPdfBtn.style.display = "inline-block";
+    try {
+      const midiData = await response.json();
+      drawScore(midiData);
+      downloadMidiBtn.style.display = "inline-block";
+      downloadPdfBtn.style.display = "inline-block";
+    } catch (err) {
+      alert('Errore durante la trascrizione.');
+      console.error(err);
+    }
   });
 
   downloadMidiBtn.addEventListener('click', () => {
@@ -141,16 +146,12 @@
       const pitch = midiNumberToNoteName(note.pitch);
       const durationSeconds = note.end_time - note.start_time;
       let duration = "q";
-      if (durationSeconds > 1.5) {
-        duration = "w";
-      } else if (durationSeconds > 0.75) {
-        duration = "h";
-      } else if (durationSeconds > 0.35) {
-        duration = "q";
-      } else {
-        duration = "8";
-      }
-      return new VF.StaveNote({ clef: "treble", keys: [pitch], duration: duration });
+      if (durationSeconds > 1.5) duration = "w";
+      else if (durationSeconds > 0.75) duration = "h";
+      else if (durationSeconds > 0.35) duration = "q";
+      else duration = "8";
+
+      return new VF.StaveNote({ clef: "treble", keys: [pitch], duration });
     });
 
     const voice = new VF.Voice({ num_beats: 4, beat_value: 4 });
