@@ -86,27 +86,32 @@
     }
   });
 
-  transcribeBtn.addEventListener('click', async () => {
-    if (!selectedAudioBlob) {
-      alert('Prima registra o carica un file audio.');
-      return;
-    }
+transcribeBtn.addEventListener('click', async () => {
+  if (!selectedAudioBlob) {
+    alert('Prima registra o carica un file audio.');
+    return;
+  }
 
-    const formData = new FormData();
-    formData.append('audio', selectedAudioBlob);
+  const formData = new FormData();
+  formData.append('audio', selectedAudioBlob);
 
+  try {
     const response = await fetch('/transcribe', { method: 'POST', body: formData });
+    const result = await response.json();
 
-    try {
-      const midiData = await response.json();
-      drawScore(midiData);
-      downloadMidiBtn.style.display = "inline-block";
-      downloadPdfBtn.style.display = "inline-block";
-    } catch (err) {
-      alert('Errore durante la trascrizione.');
-      console.error(err);
+    if (!result.notes || !Array.isArray(result.notes)) {
+      throw new Error(result.error || "Nessuna nota trovata nella risposta.");
     }
-  });
+
+    drawScore(result);
+    downloadMidiBtn.style.display = "inline-block";
+    downloadPdfBtn.style.display = "inline-block";
+  } catch (err) {
+    alert('Errore durante la trascrizione: ' + err.message);
+    console.error(err);
+  }
+});
+
 
   downloadMidiBtn.addEventListener('click', () => {
     window.location.href = '/download_midi';
