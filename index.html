@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <title>Trascrivi Spartito dal Microfono</title>
+  <title>Trascrivi Spartito dal Microfono o File</title>
   <script src="https://unpkg.com/vexflow/releases/vexflow-min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -21,15 +20,17 @@
   chiediPassword();
 </script>
 
-<h1>Registrazione dal Microfono</h1>
+<h1>Registrazione o Caricamento Audio</h1>
 
 <button id="startRecording">🎙️ Avvia Registrazione</button>
 <button id="stopRecording" disabled>⏹️ Ferma Registrazione</button>
+<br><br>
+<input type="file" id="audioFile" accept="audio/*">
+<br><br>
+<button id="transcribeBtn" disabled>🎼 Trascrivi Spartito</button>
+<br><br>
 <button id="downloadMidiBtn" style="display:none;">💾 Scarica MIDI</button>
 <button id="downloadPdfBtn" style="display:none;">📄 Scarica PDF Spartito</button>
-<h2>📁 Oppure carica un file audio:</h2>
-<input type="file" id="audioFile" accept="audio/*">
-
 
 <h2>Spartito Generato:</h2>
 <div id="score"></div>
@@ -37,9 +38,12 @@
 <script>
   let mediaRecorder;
   let audioChunks = [];
+  let selectedAudioBlob = null;
 
   const startBtn = document.getElementById('startRecording');
   const stopBtn = document.getElementById('stopRecording');
+  const fileInput = document.getElementById('audioFile');
+  const transcribeBtn = document.getElementById('transcribeBtn');
   const downloadMidiBtn = document.getElementById('downloadMidiBtn');
   const downloadPdfBtn = document.getElementById('downloadPdfBtn');
 
@@ -47,24 +51,18 @@
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
 
-    mediaRecorder.start();
     audioChunks = [];
+    mediaRecorder.start();
 
     mediaRecorder.addEventListener('dataavailable', event => {
-      audioChunks.push(event.data);
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
     });
 
-    mediaRecorder.addEventListener('stop', async () => {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
-
-      const response = await fetch('/transcribe', { method: 'POST', body: formData });
-      const midiData = await response.json();
-
-      drawScore(midiData);
-      downloadMidiBtn.style.display = "block";
-      downloadPdfBtn.style.display = "block";
+    mediaRecorder.addEventListener('stop', () => {
+      selectedAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      transcribeBtn.disabled = false;
     });
 
     startBtn.disabled = true;
@@ -77,6 +75,31 @@
     stopBtn.disabled = true;
   });
 
+  fileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      selectedAudioBlob = file;
+      transcribeBtn.disabled = false;
+    }
+  });
+
+  transcribeBtn.addEventListener('click', async () => {
+    if (!selectedAudioBlob) {
+      alert('Prima registra o carica un file audio.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('audio', selectedAudioBlob);
+
+    const response = await fetch('/transcribe', { method: 'POST', body: formData });
+    const midiData = await response.json();
+
+    drawScore(midiData);
+    downloadMidiBtn.style.display = "inline-block";
+    downloadPdfBtn.style.display = "inline-block";
+  });
+
   downloadMidiBtn.addEventListener('click', () => {
     window.location.href = '/download_midi';
   });
@@ -84,11 +107,11 @@
   downloadPdfBtn.addEventListener('click', () => {
     const element = document.getElementById('score');
     const opt = {
-      margin:       0.5,
-      filename:     'spartito_trascritto.pdf',
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      margin: 0.5,
+      filename: 'spartito_trascritto.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
     html2pdf().from(element).set(opt).save();
   });
@@ -114,7 +137,7 @@
     stave.addClef("treble").addTimeSignature("4/4");
     stave.setContext(context).draw();
 
-    const notes = midiData.map(note => {
+    const notes = midiData.notes.map(note => {
       const pitch = midiNumberToNoteName(note.pitch);
       const durationSeconds = note.end_time - note.start_time;
       let duration = "q";
@@ -143,24 +166,7 @@
     const name = names[midi % 12];
     return name.replace("#", "#") + "/" + octave;
   }
-
-const fileInput = document.getElementById('audioFile');
-
-fileInput.addEventListener('change', async (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    const formData = new FormData();
-    formData.append('audio', file);
-
-    const response = await fetch('/transcribe', { method: 'POST', body: formData });
-    const midiData = await response.json();
-
-    drawScore(midiData);
-    downloadMidiBtn.style.display = "block";
-    downloadPdfBtn.style.display = "block";
-  }
-});
-
 </script>
+
 </body>
 </html>
