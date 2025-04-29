@@ -15,11 +15,11 @@ def transcribe():
     if not file:
         return jsonify({"error": "Nessun file ricevuto"}), 400
 
-    # Salva il file temporaneamente
+    # Salva il file temporaneamente con estensione originale
     temp_input_path = tempfile.NamedTemporaryFile(suffix=os.path.splitext(file.filename)[-1], delete=False).name
     file.save(temp_input_path)
 
-    # Converte in WAV con ffmpeg (qualunque sia il formato in ingresso)
+    # Converte il file in WAV con ffmpeg
     temp_output_path = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
     conversion_result = os.system(f"ffmpeg -y -i \"{temp_input_path}\" -ar 22050 -ac 1 \"{temp_output_path}\"")
 
@@ -27,28 +27,18 @@ def transcribe():
         os.remove(temp_input_path)
         return jsonify({"error": "Errore durante la conversione audio"}), 500
 
-   try:
-    output = inference.predict([temp_output_path], save_midi=True)
-    if output and isinstance(output, list) and 'note_sequence' in output[0]:
-        midi_notes = output[0]['note_sequence']
-        return jsonify({ "notes": midi_notes })
-    else:
-        return jsonify({ "error": "Analisi audio fallita." }), 500
-except Exception as e:
-    return jsonify({"error": f"Errore nella trascrizione: {str(e)}"}), 500
-finally:
-    os.remove(temp_input_path)
-    os.remove(temp_output_path)
-
-
+    try:
+        output = inference.predict([temp_output_path], save_midi=True)
+        if output and isinstance(output, list) and 'note_sequence' in output[0]:
+            midi_notes = output[0]['note_sequence']
+            return jsonify({ "notes": midi_notes })
+        else:
+            return jsonify({ "error": "Analisi audio fallita." }), 500
     except Exception as e:
         return jsonify({"error": f"Errore nella trascrizione: {str(e)}"}), 500
     finally:
         os.remove(temp_input_path)
         os.remove(temp_output_path)
-
-    return jsonify(midi_notes)
-
 
 @app.route('/download_midi', methods=['GET'])
 def download_midi():
