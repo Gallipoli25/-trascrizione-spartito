@@ -1,10 +1,13 @@
-
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template  # <--- AGGIUNTA QUI
 import tempfile
 import basic_pitch.inference as inference
 import os
 
 app = Flask(__name__)
+
+@app.route('/')  # <--- AGGIUNTA QUESTA FUNZIONE
+def home():
+    return send_file('index.html')
 
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
